@@ -25,7 +25,8 @@ export declare type CompileSerialize = {
     cache: Map<any, any>
     setCache: (cache: Map<any, any>) => void
     getCache: () => Map<any, any>
-    setDebugOptions: (enable: boolean, dir?: string, force?: boolean) => void
+    setDebugOptions: (enable: boolean, dir?: string) => void
+    getDebugOptions: () => { enable: boolean; dir?: string }
     getCompileCache: (classMap?: Record<string, any> | null) => Map<string, any>
 }
 

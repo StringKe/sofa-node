@@ -1,12 +1,12 @@
 import * as assert from 'assert'
 import * as fs from 'fs'
 import * as path from 'path'
-import * as process from 'process'
 
 import * as codegen from '@protobufjs/codegen'
 
-import { combineCompile, compileProp } from '../base'
+import { compileProp } from '../base'
 import TypeMap from '../PrimitiveType'
+import { CompileSerialize } from '../types'
 import utils from '../utils'
 
 export const classMapCacheOn = Symbol('classMapCacheOn')
@@ -19,12 +19,62 @@ const bufferType: Record<string, boolean> = {
     'java.lang.Byte': true,
 }
 
+let cache: Map<any, any> = new Map()
 let getCompileCache: (classMap?: Record<string, any> | null) => Map<any, any>
-export default (() => {
-    const fn = combineCompile('v3', compile, classMapCacheOn)
-    getCompileCache = fn.getCompileCache
-    return fn
-})()
+
+let ENABLE_DEBUG = !!process.env['HESSIAN_COMPILE_DEBUG']
+let DEBUG_DIR = process.env['HESSIAN_COMPILE_DEBUG_DIR']
+
+const combine: CompileSerialize = function InnerCompile(
+    info,
+    version,
+    classMap,
+    options,
+) {
+    options = Object.assign({}, options, {
+        debug: ENABLE_DEBUG,
+        debugDir: DEBUG_DIR,
+    })
+
+    info.type = info.type || info.$class
+    const uniqueId = utils.normalizeUniqId(info, version)
+    return compile(uniqueId, info, classMap, version, options)
+}
+
+combine.cache = cache
+combine.setCache = (newCache: Map<any, any>) => {
+    cache = newCache
+}
+combine.getCache = () => {
+    return cache
+}
+combine.setDebugOptions = (enable: boolean, dir?: string) => {
+    ENABLE_DEBUG = enable
+    DEBUG_DIR = dir
+}
+combine.getDebugOptions = () => {
+    return {
+        enable: ENABLE_DEBUG,
+        dir: DEBUG_DIR,
+    }
+}
+combine.classMapCacheOn = classMapCacheOn
+combine.getCompileCache = getCompileCache = (
+    classMap?: Record<string, any> | null,
+) => {
+    if (!cache) {
+        cache = new Map()
+    }
+
+    if (!cache.get(classMapCacheOn)) {
+        return cache
+    }
+    if (!cache.has(classMap)) {
+        cache.set(classMap, new Map())
+    }
+    return cache.get(classMap)
+}
+export default combine
 
 function compile(
     uniqueId: string,
